@@ -1,5 +1,6 @@
 from typing import Annotated, List
 from decimal import Decimal
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import select
@@ -87,7 +88,7 @@ async def list_orders(db: DbDep):
 
 
 @router.get("/{order_id}", response_model=OrderDetailResponse)
-async def get_order(order_id: str, db: DbDep):
+async def get_order(order_id: UUID, db: DbDep):
     result = await db.execute(
         select(Order)
         .options(selectinload(Order.items), selectinload(Order.customer))
@@ -100,7 +101,7 @@ async def get_order(order_id: str, db: DbDep):
 
 
 @router.patch("/{order_id}/confirm", response_model=OrderDetailResponse)
-async def confirm_order(order_id: str, db: DbDep):
+async def confirm_order(order_id: UUID, db: DbDep):
     result = await db.execute(
         select(Order)
         .options(selectinload(Order.items), selectinload(Order.customer))
@@ -118,7 +119,7 @@ async def confirm_order(order_id: str, db: DbDep):
 
 
 @router.delete("/{order_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def cancel_order(order_id: str, db: DbDep):
+async def cancel_order(order_id: UUID, db: DbDep):
     # 1. Load order with items
     result = await db.execute(
         select(Order)

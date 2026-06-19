@@ -1,11 +1,13 @@
 from typing import Annotated, List
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
-from sqlalchemy import select
+from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
-from models import Product
+from models import OrderItem, Product
 from schemas import ProductCreate, ProductResponse, ProductUpdate
 
 router = APIRouter()
@@ -23,7 +25,11 @@ async def create_product(payload: ProductCreate, db: DbDep):
 
     product = Product(**payload.model_dump())
     db.add(product)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(status_code=409, detail="SKU already exists")
     await db.refresh(product)
     return product
 
@@ -41,7 +47,7 @@ async def list_products(
 
 
 @router.get("/{product_id}", response_model=ProductResponse)
-async def get_product(product_id: str, db: DbDep):
+async def get_product(product_id: UUID, db: DbDep):
     result = await db.execute(select(Product).where(Product.id == product_id))
     product = result.scalars().first()
     if not product:
@@ -50,7 +56,7 @@ async def get_product(product_id: str, db: DbDep):
 
 
 @router.put("/{product_id}", response_model=ProductResponse)
-async def update_product(product_id: str, payload: ProductUpdate, db: DbDep):
+async def update_product(product_id: UUID, payload: ProductUpdate, db: DbDep):
     result = await db.execute(select(Product).where(Product.id == product_id))
     product = result.scalars().first()
     if not product:
@@ -62,21 +68,53 @@ async def update_product(product_id: str, payload: ProductUpdate, db: DbDep):
     if "quantity" in updates and updates["quantity"] < 0:
         raise HTTPException(status_code=400, detail="Quantity cannot be negative")
 
+    # Guard: SKU must stay unique across other products
+    if "sku" in updates:
+        conflict = await db.execute(
+            select(Product).where(Product.sku == updates["sku"], Product.id != product_id)
+        )
+        if conflict.scalars().first():
+            raise HTTPException(status_code=409, detail="SKU already in use by another product")
+
     for field, value in updates.items():
         setattr(product, field, value)
 
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(status_code=409, detail="SKU already in use by another product")
     await db.refresh(product)
     return product
 
 
 @router.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_product(product_id: str, db: DbDep):
+async def delete_product(product_id: UUID, db: DbDep):
     result = await db.execute(select(Product).where(Product.id == product_id))
     product = result.scalars().first()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
 
-    await db.delete(product)
-    await db.commit()
+    # Block deletion if the product is referenced by any order
+    item_count = await db.scalar(
+        select(func.count()).select_from(OrderItem).where(OrderItem.product_id == product_id)
+    )
+    if item_count:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"Cannot delete '{product.name}' — it appears in {item_count} "
+                f"order(s). Products referenced by existing orders can't be removed."
+            ),
+        )
+
+    try:
+        await db.delete(product)
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="Cannot delete this product because it is referenced by existing orders.",
+        )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
