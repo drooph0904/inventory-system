@@ -99,6 +99,24 @@ async def get_order(order_id: str, db: DbDep):
     return order
 
 
+@router.patch("/{order_id}/confirm", response_model=OrderDetailResponse)
+async def confirm_order(order_id: str, db: DbDep):
+    result = await db.execute(
+        select(Order)
+        .options(selectinload(Order.items), selectinload(Order.customer))
+        .where(Order.id == order_id)
+    )
+    order = result.scalars().first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    if order.status != "pending":
+        raise HTTPException(status_code=400, detail=f"Order is already {order.status}")
+    order.status = "confirmed"
+    await db.commit()
+    await db.refresh(order)
+    return order
+
+
 @router.delete("/{order_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def cancel_order(order_id: str, db: DbDep):
     # 1. Load order with items
@@ -110,6 +128,10 @@ async def cancel_order(order_id: str, db: DbDep):
     order = result.scalars().first()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
+    if order.status == "confirmed":
+        raise HTTPException(status_code=400, detail="Confirmed orders cannot be cancelled")
+    if order.status == "cancelled":
+        raise HTTPException(status_code=400, detail="Order is already cancelled")
 
     # 2. Restore stock for each item
     for item in order.items:
@@ -118,7 +140,7 @@ async def cancel_order(order_id: str, db: DbDep):
         if product:
             product.quantity += item.quantity
 
-    # 3. Delete order (cascade deletes items)
-    await db.delete(order)
+    # 3. Mark as cancelled — keep the record for history
+    order.status = "cancelled"
     await db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)

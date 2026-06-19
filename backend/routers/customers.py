@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
 from models import Customer
-from schemas import CustomerCreate, CustomerResponse
+from schemas import CustomerCreate, CustomerResponse, CustomerUpdate
 
 router = APIRouter()
 
@@ -40,6 +40,30 @@ async def get_customer(customer_id: str, db: DbDep):
     customer = result.scalars().first()
     if not customer:
         raise HTTPException(status_code=404, detail="Customer not found")
+    return customer
+
+
+@router.put("/{customer_id}", response_model=CustomerResponse)
+async def update_customer(customer_id: str, payload: CustomerUpdate, db: DbDep):
+    result = await db.execute(select(Customer).where(Customer.id == customer_id))
+    customer = result.scalars().first()
+    if not customer:
+        raise HTTPException(status_code=404, detail="Customer not found")
+
+    updates = payload.model_dump(exclude_unset=True)
+
+    if "email" in updates:
+        conflict = await db.execute(
+            select(Customer).where(Customer.email == updates["email"], Customer.id != customer_id)
+        )
+        if conflict.scalars().first():
+            raise HTTPException(status_code=409, detail="Email already in use by another customer")
+
+    for field, value in updates.items():
+        setattr(customer, field, value)
+
+    await db.commit()
+    await db.refresh(customer)
     return customer
 
 
