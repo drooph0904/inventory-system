@@ -4,10 +4,13 @@ import Badge from '../components/Badge';
 import Modal from '../components/Modal';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ProductForm from './ProductForm';
+import Pagination from '../components/Pagination';
 import { useToast } from '../components/Toast';
 import { Package, Plus, Search, Pencil, Trash2 } from 'lucide-react';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { parseApiError } from '../api/errors';
+
+const PAGE_SIZE = 8;
 
 export default function Products() {
   const showToast = useToast();
@@ -17,6 +20,7 @@ export default function Products() {
   const [editProduct, setEditProduct] = useState(null);
   const [search, setSearch] = useState('');
   const [stockFilter, setStockFilter] = useState('all');
+  const [page, setPage] = useState(1);
   const [confirmTarget, setConfirmTarget] = useState(null);
 
   const fetchProducts = useCallback(() => {
@@ -98,6 +102,9 @@ export default function Products() {
       !search || p.name.toLowerCase().includes(search.toLowerCase()) || p.sku.toLowerCase().includes(search.toLowerCase())
     );
 
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
   if (loading) return <LoadingSpinner />;
 
   return (
@@ -122,7 +129,7 @@ export default function Products() {
         {SUMMARY_CARDS.map((c) => (
           <div
             key={c.label}
-            onClick={() => c.filter && setStockFilter(stockFilter === c.filter ? 'all' : c.filter)}
+            onClick={() => { if (c.filter) { setStockFilter(stockFilter === c.filter ? 'all' : c.filter); setPage(1); } }}
             className={`shimmer-card rounded-2xl px-5 py-4 card-hover transition-colors ${c.filter ? 'cursor-pointer' : 'cursor-default'}`}
             style={{
               background: c.bg,
@@ -146,7 +153,7 @@ export default function Products() {
           {TABS.map((t) => (
             <button
               key={t.key}
-              onClick={() => setStockFilter(t.key)}
+              onClick={() => { setStockFilter(t.key); setPage(1); }}
               className="px-3 py-1.5 rounded-lg text-sm font-medium transition-all"
               style={{
                 background: stockFilter === t.key ? 'var(--surface)' : 'transparent',
@@ -174,7 +181,7 @@ export default function Products() {
             type="text"
             placeholder="Search by name or SKU..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
             className="theme-input w-64 pl-9 pr-4 py-2.5 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 shadow-sm"
           />
         </div>
@@ -191,14 +198,14 @@ export default function Products() {
             </tr>
           </thead>
           <tbody>
-            {filtered.length === 0 ? (
+            {paginated.length === 0 ? (
               <tr>
                 <td colSpan={6} className="px-6 py-16 text-center">
                   <Package size={32} className="mx-auto mb-3" style={{ color: 'var(--text-3)' }} />
                   <p className="text-sm font-medium" style={{ color: 'var(--text-3)' }}>No products found</p>
                 </td>
               </tr>
-            ) : filtered.map((p, idx) => (
+            ) : paginated.map((p, idx) => (
               <tr key={p.id}
                 className="theme-row-hover transition-colors animate-fade-in-up"
                 style={{ borderBottom: '1px solid var(--divider)', animationDelay: `${200 + idx * 40}ms` }}>
@@ -241,13 +248,7 @@ export default function Products() {
         </table>
 
         {filtered.length > 0 && (
-          <div className="px-6 py-3" style={{ background: 'var(--surface-2)', borderTop: '1px solid var(--divider)' }}>
-            <p className="text-xs" style={{ color: 'var(--text-3)' }}>
-              {filtered.length === products.length
-                ? `${products.length} products total`
-                : `Showing ${filtered.length} of ${products.length}`}
-            </p>
-          </div>
+          <Pagination page={page} totalPages={totalPages} total={filtered.length} pageSize={PAGE_SIZE} onPage={setPage} />
         )}
       </div>
 

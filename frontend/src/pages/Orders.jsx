@@ -6,6 +6,7 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import { useToast } from '../components/Toast';
 import { ShoppingCart, Search, Eye, XCircle, Plus, CheckCircle, Download } from 'lucide-react';
 import ConfirmDialog from '../components/ConfirmDialog';
+import Pagination from '../components/Pagination';
 import { parseApiError } from '../api/errors';
 
 const PAGE_SIZE = 10;
@@ -307,21 +308,8 @@ export default function Orders() {
           </tbody>
         </table>
 
-        {filtered.length > PAGE_SIZE && (
-          <div className="px-6 py-3 flex items-center justify-between" style={{ background: 'var(--surface-2)', borderTop: '1px solid var(--divider)' }}>
-            <span className="text-xs" style={{ color: 'var(--text-3)' }}>
-              {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length}
-            </span>
-            <div className="flex gap-2">
-              {[{ label: '‹', disabled: page === 1, fn: () => setPage((p) => p - 1) }, { label: '›', disabled: page === totalPages, fn: () => setPage((p) => p + 1) }].map(({ label, disabled, fn }) => (
-                <button key={label} disabled={disabled} onClick={fn}
-                  className="px-3 py-1 rounded-lg text-sm font-medium transition-colors disabled:opacity-30"
-                  style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-2)' }}>
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
+        {filtered.length > 0 && (
+          <Pagination page={page} totalPages={totalPages} total={filtered.length} pageSize={PAGE_SIZE} onPage={setPage} />
         )}
       </div>
 

@@ -3,10 +3,13 @@ import API from '../api/client';
 import Modal from '../components/Modal';
 import LoadingSpinner from '../components/LoadingSpinner';
 import CustomerForm from './CustomerForm';
+import Pagination from '../components/Pagination';
 import { useToast } from '../components/Toast';
 import { Users, Plus, Search, Trash2, Mail, Phone, Pencil } from 'lucide-react';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { parseApiError } from '../api/errors';
+
+const PAGE_SIZE = 8;
 
 function Avatar({ name }) {
   const initials = name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2);
@@ -27,6 +30,7 @@ export default function Customers() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editCustomer, setEditCustomer] = useState(null);
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
   const [confirmTarget, setConfirmTarget] = useState(null);
 
   const fetchCustomers = useCallback(() => {
@@ -52,6 +56,9 @@ export default function Customers() {
   const filtered = customers.filter((c) =>
     !search || c.full_name.toLowerCase().includes(search.toLowerCase()) || c.email.toLowerCase().includes(search.toLowerCase())
   );
+
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   if (loading) return <LoadingSpinner />;
 
@@ -79,7 +86,7 @@ export default function Customers() {
           type="text"
           placeholder="Search by name or email..."
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => { setSearch(e.target.value); setPage(1); }}
           className="theme-input w-full max-w-sm pl-9 pr-4 py-2.5 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-400 shadow-sm"
         />
       </div>
@@ -95,14 +102,14 @@ export default function Customers() {
             </tr>
           </thead>
           <tbody>
-            {filtered.length === 0 ? (
+            {paginated.length === 0 ? (
               <tr>
                 <td colSpan={4} className="px-6 py-16 text-center">
                   <Users size={32} className="mx-auto mb-3" style={{ color: 'var(--text-3)' }} />
                   <p className="text-sm font-medium" style={{ color: 'var(--text-3)' }}>No customers found</p>
                 </td>
               </tr>
-            ) : filtered.map((c, idx) => (
+            ) : paginated.map((c, idx) => (
               <tr key={c.id}
                 className="theme-row-hover transition-colors animate-fade-in-up"
                 style={{ borderBottom: '1px solid var(--divider)', animationDelay: `${160 + idx * 40}ms` }}>
@@ -137,11 +144,7 @@ export default function Customers() {
           </tbody>
         </table>
         {filtered.length > 0 && (
-          <div className="px-6 py-3" style={{ background: 'var(--surface-2)', borderTop: '1px solid var(--divider)' }}>
-            <p className="text-xs" style={{ color: 'var(--text-3)' }}>
-              {filtered.length === customers.length ? `${customers.length} customers total` : `Showing ${filtered.length} of ${customers.length}`}
-            </p>
-          </div>
+          <Pagination page={page} totalPages={totalPages} total={filtered.length} pageSize={PAGE_SIZE} onPage={setPage} />
         )}
       </div>
 

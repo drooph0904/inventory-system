@@ -4,6 +4,9 @@ import API from '../api/client';
 import Badge from '../components/Badge';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { Package, Users, ShoppingCart, TrendingUp, AlertTriangle, ArrowRight } from 'lucide-react';
+import Pagination from '../components/Pagination';
+
+const ORDERS_PAGE_SIZE = 5;
 
 function useCountUp(target, duration = 900) {
   const [count, setCount] = useState(0);
@@ -63,6 +66,7 @@ export default function Dashboard() {
   const [products, setProducts] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [orders, setOrders] = useState([]);
+  const [ordersPage, setOrdersPage] = useState(1);
 
   useEffect(() => {
     Promise.all([API.get('/products'), API.get('/customers'), API.get('/orders')])
@@ -75,7 +79,9 @@ export default function Dashboard() {
 
   const totalRevenue = orders.filter((o) => o.status === 'confirmed').reduce((s, o) => s + (parseFloat(o.total_amount) || 0), 0);
   const lowStock = products.filter((p) => p.quantity < 10);
-  const recentOrders = [...orders].reverse().slice(0, 5);
+  const sortedOrders = [...orders].reverse();
+  const ordersTotalPages = Math.ceil(sortedOrders.length / ORDERS_PAGE_SIZE);
+  const recentOrders = sortedOrders.slice((ordersPage - 1) * ORDERS_PAGE_SIZE, ordersPage * ORDERS_PAGE_SIZE);
   const custMap = customers.reduce((m, c) => { m[c.id] = c; return m; }, {});
   const statValues = { products: products.length, customers: customers.length, orders: orders.length, revenue: totalRevenue };
 
@@ -176,10 +182,14 @@ export default function Dashboard() {
             })}
           </tbody>
         </table>
-        {recentOrders.length > 0 && (
-          <div className="px-6 py-3" style={{ background: 'var(--surface-2)', borderTop: '1px solid var(--divider)' }}>
-            <p className="text-xs" style={{ color: 'var(--text-3)' }}>Showing last {recentOrders.length} orders</p>
-          </div>
+        {sortedOrders.length > 0 && (
+          <Pagination
+            page={ordersPage}
+            totalPages={ordersTotalPages}
+            total={sortedOrders.length}
+            pageSize={ORDERS_PAGE_SIZE}
+            onPage={setOrdersPage}
+          />
         )}
       </div>
     </div>
