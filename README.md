@@ -1,33 +1,144 @@
 # Inventory & Order Management System
 
-A full-stack web application for managing product inventory, customers, and orders. The system provides real-time stock validation on order creation, automatic stock restoration on order cancellation, and a low-stock alert mechanism — all exposed through a RESTful API backed by an async PostgreSQL database.
+A production-ready full-stack web application built for **Ethara.AI** to manage product inventory, customer records, and orders. The system provides real-time stock validation, order lifecycle management, revenue tracking, dark mode theming, and a responsive dashboard — all backed by an async PostgreSQL database and exposed through a RESTful API.
+
+## Live Demo
+
+| Service | URL |
+|---------|-----|
+| **Frontend (Vercel)** | https://inventory-system-orpin-eight.vercel.app |
+| **Backend API (Render)** | https://inventory-system-56zd.onrender.com |
+| **API Docs (Swagger)** | https://inventory-system-56zd.onrender.com/docs |
+| **API Docs (ReDoc)** | https://inventory-system-56zd.onrender.com/redoc |
+
+> The live app is pre-loaded with Ethara.AI-relevant products (GPU servers, NVMe storage, ML workstations) and customers (TII, G42, MBZUAI, Cohere, ADNOC, Mubadala).
+
+---
 
 ## Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
-| **Backend** | FastAPI, SQLAlchemy (async), asyncpg, PostgreSQL 16 |
-| **Frontend** | React 18, Tailwind CSS, React Router, Axios |
-| **Infrastructure** | Docker, Docker Compose, nginx |
+| **Backend** | FastAPI, SQLAlchemy (async), asyncpg, Pydantic v2, PostgreSQL 16 |
+| **Frontend** | React 18, Tailwind CSS, React Router v6, Axios |
+| **Infrastructure** | Docker, Docker Compose, nginx (multi-stage build) |
+| **Deployment** | Render (backend + PostgreSQL), Vercel (frontend), Docker Hub |
 
-## Prerequisites
+---
 
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (includes Docker Compose)
-- [Node.js 20+](https://nodejs.org/) — for local frontend development only
-- [Python 3.12+](https://www.python.org/) — for local backend development only
+## Features
+
+### Products
+- Create, edit, and delete products with name, SKU, price, and quantity
+- Inventory summary cards: Total / In Stock / Low Stock / Out of Stock
+- Filter tabs + live search by name or SKU
+- Stock status badges (In Stock / Low Stock / Out of Stock)
+- Paginated table (8 per page)
+
+### Customers
+- Create, edit, and delete customers with name, email, and phone
+- Avatar initials with colour-coded gradients
+- Live search by name or email
+- Email uniqueness validation (409 conflict on duplicate)
+- Paginated table (8 per page)
+
+### Orders
+- Place orders with multi-item selection and real-time stock guard
+- Stock is deducted immediately on order creation
+- Order lifecycle: **Pending → Confirmed** or **Pending → Cancelled**
+- Confirmed orders **cannot** be cancelled (enforced at backend)
+- Stock is fully restored when a pending order is cancelled
+- Paginated table (10 per page) with status filter tabs and search
+- Download XLS sales report with colour-coded headers, zebra rows, and confirmed-revenue footer
+
+### Order Detail
+- Visual status pipeline (Pending → Confirmed / Cancelled)
+- Full line-item breakdown with unit price, quantity, and subtotal
+- Confirm / Cancel actions with confirmation dialogs
+
+### Dashboard
+- Animated count-up stat cards: Total Products, Customers, Orders, Confirmed Revenue
+- Low-stock alert table (products with qty < 10)
+- Recent Orders table with pagination
+
+### UI / UX
+- Dark mode toggle (persists across sessions)
+- 5 accent colour themes: Indigo, Blue, Emerald, Rose, Amber
+- Shimmer card animations, fade-in-up transitions
+- In-app toast notifications (success / error) — no browser alerts
+- Confirmation dialogs for all destructive actions
+- Fully responsive layout
+
+### Error Handling
+- All Pydantic 422 validation errors are parsed and displayed inline (no crashes)
+- Out-of-stock orders rejected at API level with clear error messages
+- Duplicate SKU and duplicate email surfaced as readable messages
+- 404 on unknown resources
+
+---
+
+## API Reference
+
+### Products
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/products` | Create a product |
+| `GET` | `/products` | List all products |
+| `GET` | `/products/{id}` | Get a single product |
+| `PUT` | `/products/{id}` | Update product details or quantity |
+| `DELETE` | `/products/{id}` | Delete a product |
+
+### Customers
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/customers` | Create a customer |
+| `GET` | `/customers` | List all customers |
+| `GET` | `/customers/{id}` | Get a single customer |
+| `PUT` | `/customers/{id}` | Edit customer name, email, or phone |
+| `DELETE` | `/customers/{id}` | Delete a customer |
+
+### Orders
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/orders` | Place an order (validates and deducts stock) |
+| `GET` | `/orders` | List all orders |
+| `GET` | `/orders/{id}` | Get order detail with line items |
+| `PATCH` | `/orders/{id}/confirm` | Confirm a pending order |
+| `DELETE` | `/orders/{id}` | Cancel a pending order and restore stock |
+
+---
+
+## Business Rules (enforced at backend)
+
+| Rule | Behaviour |
+|------|-----------|
+| Stock guard | Order rejected if any item exceeds available quantity |
+| Stock deduction | Stock decreases immediately when an order is placed |
+| Cancel = restore | Cancelling a pending order restores all product quantities |
+| Confirmed lock | Confirmed orders cannot be cancelled |
+| Revenue calculation | Dashboard revenue counts **confirmed orders only** |
+| SKU uniqueness | Duplicate SKU returns 409 Conflict |
+| Email uniqueness | Duplicate customer email returns 409 Conflict |
+
+---
 
 ## Quick Start (Docker)
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/drooph0904/inventory-system.git
 cd inventory-system
-cp .env.example .env   # open .env and set secure passwords
+cp .env.example .env   # set your own passwords
 docker compose up --build
 ```
 
 - Frontend: http://localhost:3000
-- API docs (Swagger): http://localhost:8000/docs
-- API docs (ReDoc): http://localhost:8000/redoc
+- API: http://localhost:8000
+- Swagger docs: http://localhost:8000/docs
+
+---
 
 ## Local Development
 
@@ -39,7 +150,6 @@ python -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 
-# Requires a running PostgreSQL instance; update DATABASE_URL in your shell or .env
 export DATABASE_URL=postgresql+asyncpg://inventoryuser:devpassword123@localhost:5432/inventorydb
 export CORS_ORIGINS=http://localhost:3000
 
@@ -51,89 +161,116 @@ uvicorn main:app --reload --port 8000
 ```bash
 cd frontend
 npm install
-
-# Point the frontend at the local backend
 export REACT_APP_API_URL=http://localhost:8000
-
 npm start
 ```
 
-The React dev server starts at http://localhost:3000 with hot-reload enabled.
+### Seed Data
 
-## API Reference
+```bash
+# Run against any PostgreSQL instance
+psql "$DATABASE_URL" -f backend/migrations/init.sql
+```
 
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | /products | Create product |
-| GET | /products | List products (?low_stock=true) |
-| GET | /products/{id} | Get product |
-| PUT | /products/{id} | Update product |
-| DELETE | /products/{id} | Delete product |
-| POST | /customers | Create customer |
-| GET | /customers | List customers |
-| GET | /customers/{id} | Get customer |
-| DELETE | /customers/{id} | Delete customer |
-| POST | /orders | Create order (validates stock) |
-| GET | /orders | List orders |
-| GET | /orders/{id} | Get order detail |
-| DELETE | /orders/{id} | Cancel order (restores stock) |
-
-Full interactive documentation is available at `/docs` (Swagger UI) and `/redoc` when the backend is running.
+---
 
 ## Environment Variables
 
 | Variable | Description |
 |----------|-------------|
-| `POSTGRES_DB` | PostgreSQL database name |
-| `POSTGRES_USER` | PostgreSQL username |
-| `POSTGRES_PASSWORD` | PostgreSQL password — use a strong value in production |
-| `DATABASE_URL` | Full async connection string used by SQLAlchemy (`postgresql+asyncpg://...`) |
-| `CORS_ORIGINS` | Comma-separated list of allowed CORS origins (e.g. `http://localhost:3000,https://app.example.com`) |
-| `REACT_APP_API_URL` | Base URL the frontend uses to reach the backend API |
+| `POSTGRES_DB` | Database name |
+| `POSTGRES_USER` | Database username |
+| `POSTGRES_PASSWORD` | Database password |
+| `DATABASE_URL` | Full asyncpg connection string (`postgresql+asyncpg://...`) |
+| `CORS_ORIGINS` | Allowed CORS origins (comma-separated) |
+| `REACT_APP_API_URL` | Backend URL used by the frontend |
 
-## Deployment Guide
+---
 
-### Database — Render PostgreSQL (free tier)
+## Deployment
 
-1. Go to [render.com](https://render.com) and create a new **PostgreSQL** instance.
-2. Copy the **External Database URL** from the dashboard.
-3. Update `DATABASE_URL` in your backend service's environment variables (replace `postgresql://` with `postgresql+asyncpg://` for async compatibility).
+### Database — Render PostgreSQL
 
-### Backend — Render Web Service (free tier)
+1. Create a new **PostgreSQL** instance on [render.com](https://render.com).
+2. Copy the **External Database URL** and replace `postgresql://` with `postgresql+asyncpg://`.
+3. Run `psql "$DATABASE_URL" -f backend/migrations/init.sql` to initialise schema and seed data.
 
-1. Push this repository to GitHub.
-2. On Render, create a new **Web Service** and connect your GitHub repo.
-3. Select **Docker** as the runtime; set **Dockerfile Path** to `./backend/Dockerfile`.
-4. Under **Environment Variables**, add:
-   - `DATABASE_URL` — the asyncpg connection string from the step above
-   - `CORS_ORIGINS` — your Vercel frontend URL (e.g. `https://your-app.vercel.app`)
-5. Deploy. Render will build and run the container automatically on every push to `main`.
+### Backend — Render Web Service
 
-Alternatively, the `backend/render.yaml` file in this repo can be used with Render's Infrastructure-as-Code (Blueprint) feature for automated setup.
+1. Create a **Web Service**, connect the GitHub repo.
+2. Runtime: **Docker** — Dockerfile path: `./backend/Dockerfile`
+3. Environment variables:
+   - `DATABASE_URL` — asyncpg connection string
+   - `CORS_ORIGINS` — Vercel frontend URL
 
 ### Frontend — Vercel
 
-1. Import the repository on [vercel.com](https://vercel.com).
-2. Set the **Root Directory** to `frontend`.
-3. Under **Environment Variables**, add:
-   - `REACT_APP_API_URL` — the public URL of your Render backend (e.g. `https://inventory-backend.onrender.com`)
-4. Deploy. Vercel rebuilds on every push to `main`.
+1. Import the repo on [vercel.com](https://vercel.com).
+2. Root directory: `frontend`
+3. Environment variable:
+   - `REACT_APP_API_URL` — Render backend URL
+4. Vercel rebuilds automatically on every push to `main`.
+
+---
 
 ## Docker Hub
 
-Build and push images manually for use in other environments:
-
 ```bash
 # Backend
-docker build -t your-dockerhub-username/inventory-backend:latest ./backend
-docker push your-dockerhub-username/inventory-backend:latest
+docker build -t drooph0904/inventory-backend:latest ./backend
+docker push drooph0904/inventory-backend:latest
 
-# Frontend (pass the API URL as a build arg)
+# Frontend
 docker build \
-  --build-arg REACT_APP_API_URL=https://your-backend-url \
-  -t your-dockerhub-username/inventory-frontend:latest \
+  --build-arg REACT_APP_API_URL=https://inventory-system-56zd.onrender.com \
+  -t drooph0904/inventory-frontend:latest \
   ./frontend
-docker push your-dockerhub-username/inventory-frontend:latest
+docker push drooph0904/inventory-frontend:latest
 ```
 
-To use published images instead of building locally, replace the `build:` blocks in `docker-compose.yml` with `image: your-dockerhub-username/inventory-backend:latest` (and equivalent for frontend).
+---
+
+## Project Structure
+
+```
+inventory-system/
+├── backend/
+│   ├── main.py               # FastAPI app, CORS, lifespan
+│   ├── models.py             # SQLAlchemy ORM models
+│   ├── schemas.py            # Pydantic v2 request/response schemas
+│   ├── database.py           # Async engine & session
+│   ├── routers/
+│   │   ├── products.py       # Product CRUD
+│   │   ├── customers.py      # Customer CRUD + edit
+│   │   └── orders.py         # Order lifecycle
+│   ├── migrations/
+│   │   └── init.sql          # Schema + Ethara.AI seed data
+│   ├── Dockerfile
+│   └── requirements.txt
+├── frontend/
+│   ├── src/
+│   │   ├── api/
+│   │   │   ├── client.js     # Axios instance
+│   │   │   └── errors.js     # Pydantic error normaliser
+│   │   ├── components/
+│   │   │   ├── Badge.jsx
+│   │   │   ├── ConfirmDialog.jsx
+│   │   │   ├── LoadingSpinner.jsx
+│   │   │   ├── Modal.jsx
+│   │   │   ├── Pagination.jsx
+│   │   │   ├── Sidebar.jsx
+│   │   │   └── Toast.jsx
+│   │   ├── context/
+│   │   │   └── ThemeContext.jsx  # Dark mode + accent colours
+│   │   ├── pages/
+│   │   │   ├── Dashboard.jsx
+│   │   │   ├── Products.jsx / ProductForm.jsx
+│   │   │   ├── Customers.jsx / CustomerForm.jsx
+│   │   │   ├── Orders.jsx
+│   │   │   ├── OrderDetail.jsx
+│   │   │   └── CreateOrder.jsx
+│   │   └── index.css         # CSS custom properties, animations
+│   ├── Dockerfile
+│   └── nginx.conf
+└── docker-compose.yml
+```
